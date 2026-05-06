@@ -1,0 +1,1077 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OCR · From Scratch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --ink: #0d0d0d;
+    --ink2: #3a3a3a;
+    --ink3: #7a7a7a;
+    --paper: #f5f2ed;
+    --paper2: #ede9e2;
+    --paper3: #e2ddd5;
+    --accent: #c8410a;
+    --accent2: #e8622e;
+    --green: #1a6b3a;
+    --green-bg: #e8f5ee;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Inter', sans-serif;
+    --display: 'Inter', sans-serif;
+    --radius: 12px;
+    --shadow: 0 2px 12px rgba(13,13,13,.08), 0 1px 3px rgba(13,13,13,.06);
+    --shadow-lg: 0 8px 40px rgba(13,13,13,.12), 0 2px 8px rgba(13,13,13,.06);
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: var(--sans);
+    background: var(--paper);
+    color: var(--ink);
+    font-size: 16px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── GRID TEXTURE ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(13,13,13,.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(13,13,13,.03) 1px, transparent 1px);
+    background-size: 32px 32px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── HEADER ── */
+  header {
+    position: relative; z-index: 10;
+    padding: 2rem 3rem 0;
+    display: flex; align-items: flex-start; justify-content: space-between;
+    animation: fadeDown .6s ease both;
+  }
+
+  .logo {
+    display: flex; align-items: center; gap: 12px;
+  }
+
+  .logo-mark {
+    width: 42px; height: 42px;
+    background: var(--ink);
+    border-radius: 10px;
+    display: grid; place-items: center;
+  }
+
+  .logo-mark svg { width: 24px; height: 24px; }
+
+  .logo-text {
+    font-family: var(--display);
+    font-size: 1.1rem;
+    font-weight: 700;
+    letter-spacing: -.02em;
+    line-height: 1;
+  }
+
+  .logo-sub {
+    font-size: .72rem;
+    color: var(--ink3);
+    font-weight: 400;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--green-bg);
+    color: var(--green);
+    font-size: .72rem;
+    font-weight: 500;
+    letter-spacing: .04em;
+    padding: 6px 12px;
+    border-radius: 99px;
+    border: 1px solid rgba(26,107,58,.2);
+  }
+
+  .badge-dot {
+    width: 6px; height: 6px;
+    background: var(--green);
+    border-radius: 50%;
+  }
+
+  /* ── HERO ── */
+  .hero {
+    position: relative; z-index: 10;
+    text-align: center;
+    padding: 4rem 2rem 2.5rem;
+    animation: fadeUp .7s .1s ease both;
+  }
+
+  .hero-eyebrow {
+    font-family: var(--mono);
+    font-size: .75rem;
+    color: var(--accent);
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    margin-bottom: 1rem;
+  }
+
+  .hero h1 {
+    font-family: var(--display);
+    font-size: clamp(2.8rem, 7vw, 5.5rem);
+    font-weight: 800;
+    letter-spacing: -.04em;
+    line-height: .95;
+    color: var(--ink);
+    margin-bottom: 1.25rem;
+  }
+
+  .hero h1 span {
+    color: var(--accent);
+    position: relative;
+  }
+
+  .hero h1 span::after {
+    content: '';
+    position: absolute;
+    left: 0; bottom: 4px;
+    width: 100%; height: 4px;
+    background: var(--accent);
+    opacity: .3;
+    border-radius: 2px;
+  }
+
+  .hero-desc {
+    font-size: 1.05rem;
+    color: var(--ink2);
+    max-width: 520px;
+    margin: 0 auto;
+    line-height: 1.65;
+    font-weight: 300;
+  }
+
+  /* ── MAIN LAYOUT ── */
+  .app {
+    position: relative; z-index: 10;
+    max-width: 1300px;
+    margin: 0 auto;
+    padding: 0 2rem 5rem;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    align-items: start;
+  }
+
+  @media (max-width: 820px) {
+    .app { grid-template-columns: 1fr; }
+    header { padding: 1.5rem 1.5rem 0; }
+    .hero { padding: 3rem 1.5rem 2rem; }
+    .app { padding: 0 1.5rem 4rem; }
+  }
+
+  /* ── CARD ── */
+  .card {
+    background: #fff;
+    border-radius: 20px;
+    border: 1px solid var(--paper3);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    animation: fadeUp .6s ease both;
+  }
+
+  .card:nth-child(2) { animation-delay: .1s; }
+
+  .card-header {
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--paper2);
+    display: flex; align-items: center; gap: 10px;
+  }
+
+  .card-icon {
+    width: 32px; height: 32px;
+    background: var(--paper);
+    border-radius: 8px;
+    display: grid; place-items: center;
+    flex-shrink: 0;
+  }
+
+  .card-icon svg { width: 16px; height: 16px; stroke: var(--ink2); }
+
+  .card-title {
+    font-family: var(--display);
+    font-size: .9rem;
+    font-weight: 700;
+    letter-spacing: -.01em;
+  }
+
+  .card-body { padding: 1.5rem; }
+
+  /* ── DROP ZONE ── */
+  .drop-zone {
+    border: 2px dashed var(--paper3);
+    border-radius: 14px;
+    padding: 2.5rem 1.5rem;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .2s, background .2s;
+    position: relative;
+    background: var(--paper);
+  }
+
+  .drop-zone:hover, .drop-zone.drag-over {
+    border-color: var(--accent);
+    background: #fff5f2;
+  }
+
+  .drop-icon {
+    width: 52px; height: 52px;
+    background: #fff;
+    border-radius: 14px;
+    display: grid; place-items: center;
+    margin: 0 auto 1rem;
+    box-shadow: var(--shadow);
+  }
+
+  .drop-icon svg { width: 26px; height: 26px; stroke: var(--ink2); }
+
+  .drop-title {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 1rem;
+    margin-bottom: .35rem;
+  }
+
+  .drop-sub {
+    font-size: .8rem;
+    color: var(--ink3);
+    margin-bottom: 1.25rem;
+  }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 9px 20px;
+    border-radius: 9px;
+    font-family: var(--sans);
+    font-size: .85rem;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    transition: all .15s;
+  }
+
+  .btn-primary {
+    background: var(--ink);
+    color: #fff;
+  }
+
+  .btn-primary:hover { background: var(--ink2); transform: translateY(-1px); }
+  .btn-primary:active { transform: translateY(0); }
+
+  .btn-accent {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  .btn-accent:hover { background: var(--accent2); transform: translateY(-1px); }
+  .btn-accent:active { transform: translateY(0); }
+
+  .btn-ghost {
+    background: var(--paper);
+    color: var(--ink2);
+    border: 1px solid var(--paper3);
+  }
+
+  .btn-ghost:hover { background: var(--paper2); }
+
+  .btn svg { width: 15px; height: 15px; flex-shrink: 0; }
+
+  #file-input { display: none; }
+
+  /* ── PREVIEW ── */
+  #preview-wrap {
+    display: none;
+    margin-top: 1.25rem;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--paper3);
+    background: var(--paper);
+    position: relative;
+  }
+
+  #preview-wrap img {
+    width: 100%;
+    display: block;
+    max-height: 280px;
+    object-fit: contain;
+  }
+
+  .preview-label {
+    position: absolute;
+    top: 8px; left: 8px;
+    background: rgba(13,13,13,.7);
+    color: #fff;
+    font-family: var(--mono);
+    font-size: .68rem;
+    padding: 3px 8px;
+    border-radius: 5px;
+    backdrop-filter: blur(4px);
+  }
+
+  /* ── SETTINGS ── */
+  .settings-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 1.25rem;
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .field.full { grid-column: 1 / -1; }
+
+  .field label {
+    font-size: .75rem;
+    font-weight: 500;
+    color: var(--ink2);
+    letter-spacing: .03em;
+    text-transform: uppercase;
+  }
+
+  .field input[type=range] {
+    width: 100%;
+    accent-color: var(--accent);
+    height: 4px;
+    cursor: pointer;
+  }
+
+  .range-row {
+    display: flex; align-items: center; gap: 10px;
+  }
+
+  .range-val {
+    font-family: var(--mono);
+    font-size: .8rem;
+    font-weight: 500;
+    color: var(--ink);
+    min-width: 30px;
+    text-align: right;
+  }
+
+  .checkbox-row {
+    display: flex; align-items: center; gap: 8px;
+    margin-top: 4px;
+  }
+
+  .checkbox-row input[type=checkbox] {
+    accent-color: var(--accent);
+    width: 16px; height: 16px;
+    cursor: pointer;
+  }
+
+  .checkbox-row span {
+    font-size: .8rem;
+    color: var(--ink2);
+  }
+
+  /* ── RUN BUTTON ── */
+  .run-btn {
+    width: 100%;
+    margin-top: 1.25rem;
+    padding: 13px;
+    font-size: .95rem;
+    border-radius: 12px;
+    justify-content: center;
+    letter-spacing: -.01em;
+  }
+
+  /* ── LOADER ── */
+  .loader {
+    display: none;
+    align-items: center;
+    gap: 12px;
+    padding: 1rem;
+    background: var(--paper);
+    border-radius: 10px;
+    margin-top: 1rem;
+    font-size: .83rem;
+    color: var(--ink2);
+  }
+
+  .loader.visible { display: flex; }
+
+  .spinner {
+    width: 18px; height: 18px;
+    border: 2px solid var(--paper3);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+    flex-shrink: 0;
+  }
+
+  /* ── STATS BAR ── */
+  .stats-bar {
+    display: none;
+    gap: 0;
+    margin-bottom: 1.25rem;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--paper3);
+  }
+
+  .stats-bar.visible { display: flex; }
+
+  .stat {
+    flex: 1;
+    padding: .85rem 1rem;
+    text-align: center;
+    background: var(--paper);
+    border-right: 1px solid var(--paper3);
+  }
+
+  .stat:last-child { border-right: none; }
+
+  .stat-val {
+    font-family: var(--display);
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1;
+  }
+
+  .stat-key {
+    font-size: .68rem;
+    color: var(--ink3);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    margin-top: 3px;
+  }
+
+  /* ── OUTPUT ── */
+  .output-area {
+    display: none;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .output-area.visible { display: flex; }
+
+  .output-box {
+    background: var(--paper);
+    border-radius: 12px;
+    border: 1px solid var(--paper3);
+    padding: 1.5rem;
+    font-family: var(--mono);
+    font-size: 0.95rem;
+    line-height: 1.7;
+    color: var(--ink);
+    white-space: pre-wrap;
+    word-break: break-word;
+    min-height: 300px;
+    max-height: 600px;
+    overflow-y: auto;
+  }
+
+  .output-box::-webkit-scrollbar { width: 6px; }
+  .output-box::-webkit-scrollbar-track { background: transparent; }
+  .output-box::-webkit-scrollbar-thumb { background: var(--paper3); border-radius: 3px; }
+
+  .output-actions {
+    display: flex; gap: 8px; flex-wrap: wrap;
+  }
+
+  /* ── META INFO ── */
+  .meta-pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-family: var(--mono);
+    font-size: .7rem;
+    color: var(--ink3);
+    background: var(--paper);
+    border: 1px solid var(--paper3);
+    border-radius: 6px;
+    padding: 3px 8px;
+  }
+
+  .meta-row {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    margin-top: .5rem;
+  }
+
+  /* ── ERROR ── */
+  .error-box {
+    display: none;
+    background: #fff5f5;
+    border: 1px solid #fcc;
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+    color: #c00;
+    font-size: .83rem;
+    margin-top: 1rem;
+  }
+
+  .error-box.visible { display: block; }
+
+  /* ── EMPTY STATE ── */
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3.5rem 1.5rem;
+    text-align: center;
+    color: var(--ink3);
+    gap: 10px;
+  }
+
+  .empty-state svg { width: 38px; height: 38px; stroke: var(--paper3); }
+
+  .empty-state p {
+    font-size: .83rem;
+    max-width: 220px;
+    line-height: 1.5;
+  }
+
+  /* ── PIPELINE STEPS ── */
+  .pipeline {
+    margin-top: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .pipeline-step {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: .75rem 1rem;
+    background: var(--paper);
+    border-radius: 10px;
+    border: 1px solid var(--paper2);
+    transition: background .2s;
+  }
+
+  .step-num {
+    font-family: var(--mono);
+    font-size: .7rem;
+    font-weight: 500;
+    color: #fff;
+    background: var(--ink3);
+    width: 20px; height: 20px;
+    border-radius: 6px;
+    display: grid; place-items: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .step-num.active { background: var(--accent); }
+  .step-num.done { background: var(--green); }
+
+  .step-info { flex: 1; }
+
+  .step-name {
+    font-size: .8rem;
+    font-weight: 500;
+    color: var(--ink);
+    margin-bottom: 1px;
+  }
+
+  .step-desc {
+    font-size: .72rem;
+    color: var(--ink3);
+  }
+
+  /* ── FOOTER ── */
+  footer {
+    position: relative; z-index: 10;
+    text-align: center;
+    padding: 0 2rem 2.5rem;
+    font-size: .75rem;
+    color: var(--ink3);
+  }
+
+  footer strong { color: var(--ink2); }
+
+  /* ── ANIMATIONS ── */
+  @keyframes fadeDown {
+    from { opacity: 0; transform: translateY(-16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  @keyframes pulse-in {
+    0% { transform: scale(0.97); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  .result-animate {
+    animation: pulse-in .35s ease both;
+  }
+
+  /* ── COPY TOAST ── */
+  .toast {
+    position: fixed; bottom: 2rem; right: 2rem;
+    background: var(--ink);
+    color: #fff;
+    font-size: .83rem;
+    padding: .75rem 1.25rem;
+    border-radius: 10px;
+    box-shadow: var(--shadow-lg);
+    opacity: 0;
+    transform: translateY(10px);
+    pointer-events: none;
+    transition: all .25s;
+    z-index: 9999;
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  .toast.show {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .toast svg { width: 15px; height: 15px; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-mark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="7" height="7" rx="1"/>
+        <rect x="14" y="3" width="7" height="7" rx="1"/>
+        <rect x="3" y="14" width="7" height="7" rx="1"/>
+        <rect x="14" y="14" width="7" height="7" rx="1"/>
+      </svg>
+    </div>
+    <div>
+      <div class="logo-text">Pixel·OCR</div>
+      <div class="logo-sub">Zero libraries</div>
+    </div>
+  </div>
+  <div class="badge">
+    <div class="badge-dot"></div>
+    Pure Python · No OpenCV · No NumPy
+  </div>
+</header>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-eyebrow">// optical character recognition</div>
+  <h1>Read pixels,<br><span>extract text</span></h1>
+  <p class="hero-desc">
+    A complete OCR engine built from scratch — raw byte parsing, Otsu's binarization,
+    run-length segmentation, and feature-vector matching. All pure Python.
+  </p>
+</div>
+
+<!-- APP -->
+<div class="app">
+
+  <!-- LEFT: Upload + Controls -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/>
+          <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+      </div>
+      <span class="card-title">Upload Image</span>
+    </div>
+    <div class="card-body">
+
+      <!-- Drop Zone -->
+      <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+        <div class="drop-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+            <circle cx="8.5" cy="8.5" r="1.5"/>
+            <polyline points="21 15 16 10 5 21"/>
+          </svg>
+        </div>
+        <div class="drop-title">Drop your image here</div>
+        <div class="drop-sub">PNG · BMP · JPG — up to 10 MB</div>
+        <button class="btn btn-primary" onclick="event.stopPropagation(); document.getElementById('file-input').click()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Choose file
+        </button>
+        <input type="file" id="file-input" accept=".png,.bmp,.jpg,.jpeg">
+      </div>
+
+      <!-- Preview -->
+      <div id="preview-wrap">
+        <div class="preview-label" id="preview-label">image.png</div>
+        <img id="preview-img" src="" alt="Preview">
+      </div>
+
+      <!-- Settings -->
+      <div class="settings-grid">
+        <div class="field full">
+          <label>Binarization threshold</label>
+          <div class="checkbox-row">
+            <input type="checkbox" id="auto-thresh" checked onchange="toggleThreshold(this)">
+            <span>Auto (Otsu's method)</span>
+          </div>
+        </div>
+        <div class="field full" id="thresh-field" style="display:none;">
+          <div class="range-row">
+            <input type="range" id="threshold" min="0" max="255" value="128"
+              oninput="document.getElementById('thresh-val').textContent=this.value">
+            <span class="range-val" id="thresh-val">128</span>
+          </div>
+        </div>
+        <div class="field">
+          <label>Row merge gap (px)</label>
+          <div class="range-row">
+            <input type="range" id="row-gap" min="0" max="20" value="3"
+              oninput="document.getElementById('row-val').textContent=this.value">
+            <span class="range-val" id="row-val">3</span>
+          </div>
+        </div>
+        <div class="field">
+          <label>Col merge gap (px)</label>
+          <div class="range-row">
+            <input type="range" id="col-gap" min="0" max="20" value="5"
+              oninput="document.getElementById('col-val').textContent=this.value">
+            <span class="range-val" id="col-val">5</span>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn btn-accent run-btn" onclick="runOCR()" id="run-btn" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        Run OCR
+      </button>
+
+      <!-- Loader -->
+      <div class="loader" id="loader">
+        <div class="spinner"></div>
+        <span id="loader-msg">Processing image…</span>
+      </div>
+
+      <!-- Error -->
+      <div class="error-box" id="error-box"></div>
+
+      <!-- Pipeline steps -->
+      <div class="pipeline">
+        <div class="pipeline-step" id="step-1">
+          <div class="step-num" id="sn-1">1</div>
+          <div class="step-info">
+            <div class="step-name">Decode raw bytes</div>
+            <div class="step-desc">PNG chunks / BMP header → pixel tuples</div>
+          </div>
+        </div>
+        <div class="pipeline-step" id="step-2">
+          <div class="step-num" id="sn-2">2</div>
+          <div class="step-info">
+            <div class="step-name">Grayscale conversion</div>
+            <div class="step-desc">ITU-R BT.601 luminance formula</div>
+          </div>
+        </div>
+        <div class="pipeline-step" id="step-3">
+          <div class="step-num" id="sn-3">3</div>
+          <div class="step-info">
+            <div class="step-name">Otsu binarization</div>
+            <div class="step-desc">Maximize inter-class pixel variance</div>
+          </div>
+        </div>
+        <div class="pipeline-step" id="step-4">
+          <div class="step-num" id="sn-4">4</div>
+          <div class="step-info">
+            <div class="step-name">Row / column segmentation</div>
+            <div class="step-desc">Ink-run detection + span merging</div>
+          </div>
+        </div>
+        <div class="pipeline-step" id="step-5">
+          <div class="step-num" id="sn-5">5</div>
+          <div class="step-info">
+            <div class="step-name">Feature extraction + matching</div>
+            <div class="step-desc">26-feature vector → nearest template</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- RIGHT: Output -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="4 7 4 4 20 4 20 7"/>
+          <line x1="9" y1="20" x2="15" y2="20"/>
+          <line x1="12" y1="4" x2="12" y2="20"/>
+        </svg>
+      </div>
+      <span class="card-title">Extracted Text</span>
+    </div>
+    <div class="card-body">
+
+      <!-- Stats -->
+      <div class="stats-bar" id="stats-bar">
+        <div class="stat">
+          <div class="stat-val" id="stat-lines">—</div>
+          <div class="stat-key">Lines</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val" id="stat-words">—</div>
+          <div class="stat-key">Words</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val" id="stat-chars">—</div>
+          <div class="stat-key">Chars</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val" id="stat-ms">—</div>
+          <div class="stat-key">ms</div>
+        </div>
+      </div>
+
+      <!-- Output area -->
+      <div class="output-area" id="output-area">
+        <div class="output-box result-animate" id="output-box"></div>
+        <div class="meta-row" id="meta-row"></div>
+        <div class="output-actions">
+          <button class="btn btn-primary" onclick="copyText()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            Copy text
+          </button>
+          <button class="btn btn-ghost" onclick="downloadText()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Download .txt
+          </button>
+          <button class="btn btn-ghost" onclick="resetAll()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg>
+            Reset
+          </button>
+        </div>
+      </div>
+
+      <!-- Empty state -->
+      <div class="empty-state" id="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="16" y1="13" x2="8" y2="13"/>
+          <line x1="16" y1="17" x2="8" y2="17"/>
+          <polyline points="10 9 9 9 8 9"/>
+        </svg>
+        <p>Upload an image and run OCR to see extracted text here</p>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  Built with <strong>FastAPI</strong> + pure Python OCR engine &mdash;
+  no OpenCV, no NumPy, no image libraries.
+</footer>
+
+<div class="toast" id="toast">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+  Copied to clipboard
+</div>
+
+<script>
+  let currentFile = null;
+  let currentText = '';
+  const STEPS = 5;
+
+  // Drag & drop
+  const dz = document.getElementById('drop-zone');
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+  dz.addEventListener('drop', e => {
+    e.preventDefault(); dz.classList.remove('drag-over');
+    const f = e.dataTransfer.files[0];
+    if (f) handleFile(f);
+  });
+
+  document.getElementById('file-input').addEventListener('change', e => {
+    if (e.target.files[0]) handleFile(e.target.files[0]);
+  });
+
+  function handleFile(file) {
+    currentFile = file;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      document.getElementById('preview-img').src = ev.target.result;
+      document.getElementById('preview-label').textContent = file.name;
+      document.getElementById('preview-wrap').style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+    document.getElementById('run-btn').disabled = false;
+    resetSteps();
+    document.getElementById('error-box').classList.remove('visible');
+  }
+
+  function toggleThreshold(cb) {
+    document.getElementById('thresh-field').style.display = cb.checked ? 'none' : 'block';
+  }
+
+  function resetSteps() {
+    for (let i = 1; i <= STEPS; i++) {
+      const el = document.getElementById(`sn-${i}`);
+      el.classList.remove('active', 'done');
+    }
+  }
+
+  async function animateStep(n) {
+    for (let i = 1; i < n; i++) {
+      const el = document.getElementById(`sn-${i}`);
+      el.classList.remove('active');
+      el.classList.add('done');
+    }
+    const cur = document.getElementById(`sn-${n}`);
+    cur.classList.remove('done');
+    cur.classList.add('active');
+    await new Promise(r => setTimeout(r, 300));
+  }
+
+  const MSGS = [
+    'Decoding raw image bytes…',
+    'Converting to grayscale…',
+    'Running Otsu binarization…',
+    'Segmenting text rows and columns…',
+    'Matching character features…',
+  ];
+
+  async function runOCR() {
+    if (!currentFile) return;
+    const loader = document.getElementById('loader');
+    const loaderMsg = document.getElementById('loader-msg');
+    const runBtn = document.getElementById('run-btn');
+    const errorBox = document.getElementById('error-box');
+
+    loader.classList.add('visible');
+    runBtn.disabled = true;
+    errorBox.classList.remove('visible');
+    document.getElementById('output-area').classList.remove('visible');
+    document.getElementById('stats-bar').classList.remove('visible');
+    document.getElementById('empty-state').style.display = 'none';
+    resetSteps();
+
+    // Animate steps while uploading
+    let stepIdx = 1;
+    const stepInterval = setInterval(async () => {
+      if (stepIdx <= STEPS) {
+        loaderMsg.textContent = MSGS[stepIdx - 1];
+        await animateStep(stepIdx);
+        stepIdx++;
+      }
+    }, 400);
+
+    const fd = new FormData();
+    fd.append('file', currentFile);
+    const autoThresh = document.getElementById('auto-thresh').checked;
+    if (!autoThresh) fd.append('threshold', document.getElementById('threshold').value);
+    fd.append('row_gap', document.getElementById('row-gap').value);
+    fd.append('col_gap', document.getElementById('col-gap').value);
+
+    try {
+      const res = await fetch('/api/ocr', { method: 'POST', body: fd });
+      clearInterval(stepInterval);
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || 'OCR failed');
+      }
+
+      const data = await res.json();
+
+      // Mark all done
+      for (let i = 1; i <= STEPS; i++) {
+        const el = document.getElementById(`sn-${i}`);
+        el.classList.remove('active');
+        el.classList.add('done');
+      }
+
+      // Update stats
+      document.getElementById('stat-lines').textContent = data.lines;
+      document.getElementById('stat-words').textContent = data.words;
+      document.getElementById('stat-chars').textContent = data.characters;
+      document.getElementById('stat-ms').textContent = data.elapsed_ms;
+      document.getElementById('stats-bar').classList.add('visible');
+
+      // Output
+      currentText = data.text;
+      document.getElementById('output-box').textContent = data.text || '(no text detected)';
+      document.getElementById('output-box').className = 'output-box result-animate';
+      void document.getElementById('output-box').offsetWidth;
+      document.getElementById('output-box').className = 'output-box result-animate';
+
+      // Meta row
+      document.getElementById('meta-row').innerHTML = `
+        <span class="meta-pill">${data.width}×${data.height}px</span>
+        <span class="meta-pill">threshold: ${data.threshold_used}</span>
+        <span class="meta-pill">auto: ${data.threshold_auto}</span>
+      `;
+
+      document.getElementById('output-area').classList.add('visible');
+
+    } catch (err) {
+      clearInterval(stepInterval);
+      errorBox.textContent = '⚠ ' + err.message;
+      errorBox.classList.add('visible');
+      document.getElementById('empty-state').style.display = 'flex';
+    } finally {
+      loader.classList.remove('visible');
+      runBtn.disabled = false;
+    }
+  }
+
+  function copyText() {
+    if (!currentText) return;
+    navigator.clipboard.writeText(currentText).then(() => {
+      const t = document.getElementById('toast');
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 2200);
+    });
+  }
+
+  function downloadText() {
+    if (!currentText) return;
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([currentText], { type: 'text/plain' }));
+    a.download = 'ocr_output.txt';
+    a.click();
+  }
+
+  function resetAll() {
+    currentFile = null; currentText = '';
+    document.getElementById('file-input').value = '';
+    document.getElementById('preview-wrap').style.display = 'none';
+    document.getElementById('output-area').classList.remove('visible');
+    document.getElementById('stats-bar').classList.remove('visible');
+    document.getElementById('empty-state').style.display = 'flex';
+    document.getElementById('error-box').classList.remove('visible');
+    document.getElementById('run-btn').disabled = true;
+    resetSteps();
+  }
+</script>
+</body>
+</html>
